@@ -12,7 +12,7 @@ process bamcoverage {
 
   output:
     tuple val(sample_id), path("${sample_id}.bw"), emit: bw
-    tuple val(sample_id), path("${sample_id}.bamcoverage.log.txt"), emit: log
+    tuple val(sample_id), path("${sample_id}.bamCoverage.log.txt"), emit: log
 
   script:
     def optArgs = []
