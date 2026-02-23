@@ -69,15 +69,7 @@ process bamcoverage {
 }
 
 workflow {
-  Channel
-    .fromPath(params.bam_pattern, checkIfExists: true)
-    .ifEmpty { error "No BAM files found with --bam_pattern: ${params.bam_pattern}" }
-    .map { bam ->
-      tuple(bam.baseName, bam)
-    }
-    .set { ch_bams_from_pattern }
-
-  def ch_bams = ch_bams_from_pattern
+  def ch_bams
 
   if (params.bam_list) {
     ch_bams = Channel
@@ -87,6 +79,65 @@ workflow {
         def sample_id = row[0].toString().trim()
         def bam_path  = row[1].toString().trim()
         tuple(sample_id, file(bam_path))
+      }
+  } else if (params.samples_master) {
+    def master = file(params.samples_master)
+    assert master.exists() : "samples_master not found: ${params.samples_master}"
+
+    def header = null
+    def records = []
+    master.eachLine { line, n ->
+      if (!line?.trim()) return
+      def cols = line.split(',', -1)*.trim()
+      if (n == 1) {
+        header = cols
+      } else {
+        def rec = [:]
+        header.eachWithIndex { h, i -> rec[h] = i < cols.size() ? cols[i] : '' }
+        records << rec
+      }
+    }
+
+    assert header : "samples_master header not found: ${params.samples_master}"
+    assert header.contains('sample_id') : "samples_master missing required column: sample_id"
+
+    def isEnabled = { rec ->
+      def v = rec.enabled?.toString()?.trim()?.toLowerCase()
+      (v == null || v == '' || v == 'true')
+    }
+    def isControl = { rec ->
+      rec.is_control?.toString()?.trim()?.toLowerCase() == 'true'
+    }
+
+    def includeControls = (params.bamcoverage_include_controls == null) ? true : params.bamcoverage_include_controls
+    def bamDir = file(params.bam_input_dir)
+    assert bamDir.exists() : "bam_input_dir not found: ${params.bam_input_dir}"
+
+    def rows = records
+      .findAll { rec -> isEnabled(rec) }
+      .findAll { rec -> includeControls ? true : !isControl(rec) }
+      .collect { rec ->
+        def sid = rec.sample_id?.toString()?.trim()
+        if (!sid) return null
+        def hits = bamDir.listFiles()?.findAll { f ->
+          f.isFile() && f.name.endsWith('.clean.bam') && (f.name == "${sid}.clean.bam" || f.name.startsWith("${sid}_"))
+        } ?: []
+        if (hits.isEmpty()) throw new IllegalArgumentException("No clean BAM found for sample_id '${sid}' under: ${params.bam_input_dir}")
+        if (hits.size() > 1) throw new IllegalArgumentException("Multiple clean BAM files matched sample_id '${sid}': ${hits*.name.join(', ')}")
+        [sid: sid, bam: file(hits[0].toString())]
+      }
+      .findAll { it != null }
+
+    ch_bams = Channel
+      .fromList(rows)
+      .ifEmpty { error "No BAMs generated from samples_master: ${params.samples_master}" }
+      .map { r -> tuple(r.sid, r.bam) }
+  } else {
+    ch_bams = Channel
+      .fromPath(params.bam_pattern, checkIfExists: true)
+      .ifEmpty { error "No BAM files found with --bam_pattern: ${params.bam_pattern}" }
+      .map { bam ->
+        tuple(bam.baseName, bam)
       }
   }
 
