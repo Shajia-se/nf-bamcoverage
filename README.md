@@ -12,7 +12,7 @@ Generate bigWig files from BAM using deepTools `bamCoverage`.
 
 TSV format (no header):
 ```text
-sample_id<TAB>/path/to/sample.clean.bam
+sample_id<TAB>/path/to/sample.nomulti.bam
 ```
 
 ## Mode 2: Auto from `samples_master`
@@ -27,14 +27,14 @@ is_control,enabled
 ```
 
 Auto behavior:
-- resolve BAM from `${bam_input_dir}/${sample_id}*.clean.bam`
+- resolve BAM from `${bam_input_dir}/${sample_id}*.nomulti.bam`
 - include/exclude controls via `bamcoverage_include_controls` (default `true`)
 
 ## Mode 3: `bam_pattern`
 
 Example:
 ```bash
---bam_pattern '/path/to/*.clean.bam'
+--bam_pattern '/path/to/*.nomulti.bam'
 ```
 
 ## Key Parameters
@@ -69,7 +69,7 @@ nextflow run main.nf -profile hpc \
 Pattern mode:
 ```bash
 nextflow run main.nf -profile hpc \
-  --bam_pattern '/path/*.clean.bam'
+  --bam_pattern '/path/*.nomulti.bam'
 ```
 
 Resume:
