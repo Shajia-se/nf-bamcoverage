@@ -81,6 +81,9 @@ workflow {
         tuple(sample_id, file(bam_path))
       }
   } else if (params.samples_master) {
+    if (!params.bam_input_dir) {
+      exit 1, "ERROR: --bam_input_dir must be provided when using samples_master."
+    }
     def master = file(params.samples_master)
     assert master.exists() : "samples_master not found: ${params.samples_master}"
 
@@ -133,6 +136,9 @@ workflow {
       .ifEmpty { error "No BAMs generated from samples_master: ${params.samples_master}" }
       .map { r -> tuple(r.sid, r.bam) }
   } else {
+    if (!params.bam_pattern) {
+      exit 1, "ERROR: Provide --bam_pattern, --bam_list, or --samples_master with --bam_input_dir."
+    }
     ch_bams = Channel
       .fromPath(params.bam_pattern, checkIfExists: true)
       .ifEmpty { error "No BAM files found with --bam_pattern: ${params.bam_pattern}" }
